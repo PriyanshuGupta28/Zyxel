@@ -1,69 +1,73 @@
-# React + TypeScript + Vite
+# Zyxel Spreadsheet App
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Zyxel is a modern, interactive spreadsheet application built with React, TypeScript, and Vite. It features multiple sheets, cell formatting, dropdown editors, undo/redo, and more—delivering a familiar spreadsheet experience in your browser.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- Multiple sheets with tabs
+- Cell selection, editing, and formatting (bold, italic, underline)
+- Dropdown cell editor
+- Copy, paste, undo, redo, and fill handle
+- Row and column resizing
+- Sheet management: add, delete, rename, duplicate, color
+- Keyboard shortcuts for productivity
 
-## Expanding the ESLint configuration
+## Getting Started
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### Prerequisites
 
-```js
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+- [Node.js](https://nodejs.org/) (v16 or higher recommended)
+- [npm](https://www.npmjs.com/) or [yarn](https://yarnpkg.com/)
 
-      // Remove tseslint.configs.recommended and replace with this
-      ...tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      ...tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      ...tseslint.configs.stylisticTypeChecked,
+### Installation
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+Clone the repository and install dependencies:
+
+```bash
+git clone https://github.com/PriyanshuGupta28/Zyxel.git
+cd Zyxel
+npm install
+# or
+yarn install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### Running the Development Server
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm run dev
+# or
+yarn dev
 ```
+
+Open [http://localhost:5173](http://localhost:5173) to view the app in your browser.
+
+## Project Structure
+
+- `src/components/Spreadsheet/` – Main spreadsheet components (grid, toolbar, tabs, editors)
+- `src/components/ui/` – UI primitives and reusable components
+- `src/hooks/` – Custom React hooks
+- `src/types/` – TypeScript types
+- `public/` – Static assets
+
+## Usage
+
+- Click cells to select and edit
+- Use toolbar or keyboard shortcuts for formatting
+- Right-click or use toolbar for sheet actions
+- Drag to resize rows/columns
+
+## Keyboard Shortcuts
+
+- **Ctrl/Cmd + Z**: Undo
+- **Ctrl/Cmd + Y**: Redo
+- **Ctrl/Cmd + C/V/X**: Copy/Paste/Cut
+- **Ctrl/Cmd + B/I/U**: Bold/Italic/Underline
+- **Arrow keys, Tab, Enter**: Navigate cells
+
+## Contributing
+
+Contributions are welcome! Please open issues or pull requests for bug fixes, features, or improvements.
+
+## License
+
+MIT
