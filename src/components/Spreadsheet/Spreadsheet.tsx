@@ -11,7 +11,7 @@ import {
   type SpreadsheetState,
   type Sheet,
   type DropdownOption,
-} from "@/types/claude/spreadsheet.types";
+} from "@/types/spreadsheet.types";
 
 const initialSheet: Sheet = {
   id: "sheet-1",
@@ -69,7 +69,9 @@ export const Spreadsheet: React.FC = () => {
       if (!activeSheet) return;
 
       if (state.selectedCells.length === 1) {
-        const [row, col] = state.selectedCells[0].split("-").map(Number);
+        const [row, col] = state.selectedCells[0]?.split("-").map(Number) ?? [];
+        if (row === undefined || col === undefined) return; // add this line
+
         let newRow = row;
         let newCol = col;
 
@@ -96,11 +98,11 @@ export const Spreadsheet: React.FC = () => {
             break;
           case "Enter":
             e.preventDefault();
-            handleCellEdit(state.selectedCells[0]);
+            handleCellEdit(state.selectedCells[0] || "");
             return;
           case "F2":
             e.preventDefault();
-            handleCellEdit(state.selectedCells[0]);
+            handleCellEdit(state.selectedCells[0] || "");
             return;
           case "Delete":
           case "Backspace":
@@ -194,7 +196,7 @@ export const Spreadsheet: React.FC = () => {
   );
 
   return (
-    <div className="flex flex-col h-screen bg-background">
+    <div className="bg-background flex h-full flex-col">
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -258,11 +260,11 @@ export const Spreadsheet: React.FC = () => {
       >
         <DropdownEditor
           cellId={editingDropdownCell}
-          currentDropdown={
-            editingDropdownCell
-              ? activeSheet?.cells[editingDropdownCell]?.dropdown
-              : undefined
-          }
+          // currentDropdown={
+          //   editingDropdownCell
+          //     ? activeSheet?.cells[editingDropdownCell]?.dropdown
+          //     : undefined
+          // }
           onSave={handleDropdownSave}
           onClose={() => {
             setDropdownEditorOpen(false);
