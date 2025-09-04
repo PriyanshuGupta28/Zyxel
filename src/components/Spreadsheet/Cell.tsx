@@ -1,4 +1,3 @@
-// components/Spreadsheet/Cell.tsx
 import React, { useState, useRef, useEffect, memo, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { type Cell } from "@/types/spreadsheet.types";
@@ -7,7 +6,6 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  // SelectValue,
 } from "@/components/ui/select";
 import { Link2, ChevronDown } from "lucide-react";
 
@@ -20,6 +18,7 @@ interface CellComponentProps {
   onStartEdit: () => void;
   columnWidth?: number;
   rowHeight?: number;
+  initialValue?: string;
 }
 
 export const CellComponent = memo(
@@ -30,8 +29,9 @@ export const CellComponent = memo(
     onChange,
     onStopEdit,
     onStartEdit,
-    // columnWidth = 100,
+    columnWidth = 100,
     rowHeight = 30,
+    initialValue = "",
   }: CellComponentProps) => {
     const [localValue, setLocalValue] = useState("");
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -40,22 +40,29 @@ export const CellComponent = memo(
 
     useEffect(() => {
       if (isEditing && !hasInitialized.current) {
-        setLocalValue(cell?.value || "");
+        // Use initialValue if provided (for typing), otherwise use cell value
+        setLocalValue(initialValue || cell?.value || "");
         hasInitialized.current = true;
       } else if (!isEditing) {
         hasInitialized.current = false;
       }
-    }, [isEditing, cell?.value]);
+    }, [isEditing, cell?.value, initialValue]);
 
     useEffect(() => {
       if (isEditing && inputRef.current) {
         const timer = setTimeout(() => {
           inputRef.current?.focus();
-          inputRef.current?.select();
+          // Position cursor at the end if there's an initial value
+          if (initialValue) {
+            const len = inputRef.current?.value.length || 0;
+            inputRef.current?.setSelectionRange(len, len);
+          } else {
+            inputRef.current?.select();
+          }
         }, 0);
         return () => clearTimeout(timer);
       }
-    }, [isEditing]);
+    }, [isEditing, initialValue]);
 
     const handleInputKeyDown = (
       e: React.KeyboardEvent<HTMLTextAreaElement>
@@ -107,7 +114,6 @@ export const CellComponent = memo(
             const num = parseFloat(value);
             return isNaN(num) ? value : num.toLocaleString();
           }
-
           default:
             return value;
         }
@@ -254,25 +260,43 @@ export const CellComponent = memo(
     }
 
     if (isEditing) {
-      const isWrapped = cell?.format?.textWrap === "wrap";
+      // Calculate minimum width for input (like Excel/Google Sheets)
+      const minInputWidth = Math.max(columnWidth || 100, 200);
+      const minInputHeight = Math.max(rowHeight || 30, 60);
+
       return (
-        <textarea
-          ref={inputRef}
-          className="absolute inset-0 w-full px-2 py-1 outline-none bg-background border-2 border-primary resize-none"
-          value={localValue}
-          onChange={(e) => setLocalValue(e.target.value)}
-          onKeyDown={handleInputKeyDown}
-          onBlur={handleInputBlur}
-          onClick={(e) => e.stopPropagation()}
-          onMouseDown={(e) => e.stopPropagation()}
+        <div
+          className="fixed"
           style={{
-            ...cellStyle,
-            ...mergedStyle,
-            minHeight: isWrapped ? "auto" : rowHeight,
-            height: isWrapped ? "auto" : "100%",
-            zIndex: 1000,
+            left: "auto",
+            top: "auto",
+            zIndex: 9999,
+            minWidth: minInputWidth,
+            minHeight: minInputHeight,
           }}
-        />
+        >
+          <textarea
+            ref={inputRef}
+            className="w-full h-full px-2 py-1 outline-none bg-background border-2 border-primary shadow-lg resize-none overflow-auto"
+            value={localValue}
+            onChange={(e) => setLocalValue(e.target.value)}
+            onKeyDown={handleInputKeyDown}
+            onBlur={handleInputBlur}
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            style={{
+              ...cellStyle,
+              minWidth: minInputWidth,
+              minHeight: minInputHeight,
+              width: "auto",
+              height: "auto",
+              maxWidth: "500px",
+              maxHeight: "300px",
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-word",
+            }}
+          />
+        </div>
       );
     }
 
@@ -319,7 +343,8 @@ export const CellComponent = memo(
       prevProps.isSelected === nextProps.isSelected &&
       prevProps.isEditing === nextProps.isEditing &&
       prevProps.columnWidth === nextProps.columnWidth &&
-      prevProps.rowHeight === nextProps.rowHeight
+      prevProps.rowHeight === nextProps.rowHeight &&
+      prevProps.initialValue === nextProps.initialValue
     );
   }
 );
