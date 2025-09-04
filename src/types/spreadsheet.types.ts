@@ -1,4 +1,3 @@
-// types/spreadsheet.types.ts
 export interface Cell {
   id: string;
   value: string;
