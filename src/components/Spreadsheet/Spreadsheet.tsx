@@ -1,5 +1,4 @@
-// components/Spreadsheet/Spreadsheet.tsx (Updated with merge handlers)
-import React, { useState, useCallback, useEffect, useRef } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { motion } from "framer-motion";
 import { SpreadsheetToolbar } from "./SpreadsheetToolbar";
 import { SpreadsheetGrid } from "./SpreadsheetGrid";
@@ -42,8 +41,8 @@ export const Spreadsheet: React.FC = () => {
   );
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [editingLinkCell, setEditingLinkCell] = useState<string | null>(null);
-  const typingTimeoutRef = useRef<NodeJS.Timeout>(null);
   const [typingBuffer, setTypingBuffer] = useState("");
+  const [typingCellId, setTypingCellId] = useState<string | null>(null);
 
   const {
     handleCellChange,
@@ -69,8 +68,25 @@ export const Spreadsheet: React.FC = () => {
     resizeRow,
   } = useSpreadsheet(state, setState);
 
+  // Handle typing buffer save when cell changes
+  useEffect(() => {
+    if (typingCellId && typingBuffer && !state.editingCell) {
+      // Save the typing buffer when we're no longer editing
+      handleCellChange(typingCellId, typingBuffer, true);
+      setTypingBuffer("");
+      setTypingCellId(null);
+    }
+  }, [state.editingCell, typingCellId, typingBuffer, handleCellChange]);
+
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
+      // Save typing buffer if we're changing cells
+      if (typingCellId && typingBuffer && state.editingCell !== typingCellId) {
+        handleCellChange(typingCellId, typingBuffer, false);
+        setTypingBuffer("");
+        setTypingCellId(null);
+      }
+
       // Handle typing when cell is selected but not editing
       if (
         state.selectedCells.length === 1 &&
@@ -82,32 +98,20 @@ export const Spreadsheet: React.FC = () => {
         const key = e.key;
 
         // Check if it's a printable character
-        if (key.length === 1 || key === "Backspace" || key === "Delete") {
+        if (key.length === 1) {
           e.preventDefault();
-
-          if (key === "Backspace" || key === "Delete") {
-            // Clear selected cells
-            handleDelete();
-            return;
-          }
 
           // Start typing in the cell
           const cellId = state.selectedCells[0];
+          setTypingCellId(cellId);
+          setTypingBuffer(key);
           handleCellEdit(cellId);
 
-          // Set initial typing buffer
-          if (typingTimeoutRef.current) {
-            clearTimeout(typingTimeoutRef.current);
-          }
-
-          setTypingBuffer(key);
-          typingTimeoutRef.current = setTimeout(() => {
-            if (typingBuffer) {
-              handleCellChange(cellId, typingBuffer, false);
-              setTypingBuffer("");
-            }
-          }, 0);
-
+          return;
+        } else if (key === "Backspace" || key === "Delete") {
+          e.preventDefault();
+          // Clear selected cells
+          handleDelete();
           return;
         }
       }
@@ -225,6 +229,7 @@ export const Spreadsheet: React.FC = () => {
       handleCellFormatChange,
       handleCellChange,
       typingBuffer,
+      typingCellId,
     ]
   );
 
@@ -232,13 +237,6 @@ export const Spreadsheet: React.FC = () => {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleKeyDown]);
-
-  useEffect(() => {
-    if (state.editingCell && typingBuffer) {
-      handleCellChange(state.editingCell, typingBuffer, false);
-      setTypingBuffer("");
-    }
-  }, [state.editingCell, typingBuffer, handleCellChange]);
 
   const activeSheet = state.sheets.find((s) => s.id === state.activeSheetId);
 
@@ -309,6 +307,9 @@ export const Spreadsheet: React.FC = () => {
             sheet={activeSheet}
             selectedCells={state.selectedCells}
             editingCell={state.editingCell}
+            typingBuffer={
+              state.editingCell === typingCellId ? typingBuffer : ""
+            }
             onCellChange={handleCellChange}
             onCellSelect={handleCellSelect}
             onCellEdit={handleCellEdit}
@@ -338,9 +339,15 @@ export const Spreadsheet: React.FC = () => {
         <SheetTabs
           sheets={state.sheets}
           activeSheetId={state.activeSheetId}
-          onSheetSelect={(sheetId) =>
-            setState((prev) => ({ ...prev, activeSheetId: sheetId }))
-          }
+          onSheetSelect={(sheetId) => {
+            // Save typing buffer before switching sheets
+            if (typingCellId && typingBuffer) {
+              handleCellChange(typingCellId, typingBuffer, false);
+              setTypingBuffer("");
+              setTypingCellId(null);
+            }
+            setState((prev) => ({ ...prev, activeSheetId: sheetId }));
+          }}
           onAddSheet={addSheet}
           onDeleteSheet={deleteSheet}
           onRenameSheet={renameSheet}
