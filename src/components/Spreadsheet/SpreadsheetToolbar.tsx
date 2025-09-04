@@ -42,6 +42,8 @@ interface SpreadsheetToolbarProps {
   onUndo: () => void;
   onRedo: () => void;
   onFormatChange: (format: Partial<CellFormat>) => void;
+  onMergeCells: () => void; // add this prop
+  onUnmergeCells: () => void; // add this prop
 }
 
 export const SpreadsheetToolbar: React.FC<SpreadsheetToolbarProps> = ({
