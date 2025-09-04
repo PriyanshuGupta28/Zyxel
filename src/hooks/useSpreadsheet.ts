@@ -1,4 +1,3 @@
-// hooks/useSpreadsheet.ts
 import { useCallback, useRef } from "react";
 import {
   type SpreadsheetState,
@@ -622,17 +621,7 @@ export const useSpreadsheet = (
 
       const updatedCells = { ...activeSheet.cells };
       prev.selectedCells.forEach((cellId) => {
-        if (updatedCells[cellId]) {
-          updatedCells[cellId] = {
-            ...updatedCells[cellId],
-            value: "",
-          };
-        } else {
-          updatedCells[cellId] = {
-            id: cellId,
-            value: "",
-          };
-        }
+        delete updatedCells[cellId];
       });
 
       const updatedSheet: Sheet = {
