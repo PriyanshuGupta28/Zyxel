@@ -2,12 +2,8 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, X, Palette } from "lucide-react";
-import {
-  type Sheet,
-  type DropdownOption,
-} from "@/types/claude/spreadsheet.types";
+import { type Sheet, type DropdownOption } from "@/types/spreadsheet.types";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   SheetContent,
@@ -20,6 +16,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { Input } from "@/components/ui/input";
 
 interface DropdownEditorProps {
   cellId: string | null;
@@ -47,7 +44,7 @@ export const DropdownEditor: React.FC<DropdownEditorProps> = ({
     const newOption: DropdownOption = {
       value: `option${options.length + 1}`,
       label: `Option ${options.length + 1}`,
-      backgroundColor: "#FFFFFF",
+      backgroundColor: "trasnparent",
       textColor: "#000000",
     };
     setOptions([...options, newOption]);
@@ -59,7 +56,10 @@ export const DropdownEditor: React.FC<DropdownEditorProps> = ({
     value: string
   ) => {
     const updatedOptions = [...options];
-    updatedOptions[index] = { ...updatedOptions[index], [field]: value };
+    updatedOptions[index] = {
+      ...(updatedOptions[index] as DropdownOption),
+      [field]: value,
+    };
     setOptions(updatedOptions);
   };
 
@@ -93,12 +93,12 @@ export const DropdownEditor: React.FC<DropdownEditorProps> = ({
   ];
 
   return (
-    <SheetContent side="right" className="w-96">
+    <SheetContent side="right" className="w-96 px-5">
       <SheetHeader>
-        <SheetTitle>Edit Dropdown Options</SheetTitle>
+        <SheetTitle>Dropdown Options</SheetTitle>
       </SheetHeader>
 
-      <div className="py-6 space-y-4">
+      <div className="space-y-4 py-6">
         <div className="space-y-2">
           <Label>Dropdown Options</Label>
           <AnimatePresence>
@@ -108,11 +108,7 @@ export const DropdownEditor: React.FC<DropdownEditorProps> = ({
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 20 }}
-                className="flex items-center gap-2 p-2 border rounded-lg"
-                style={{
-                  backgroundColor: option.backgroundColor,
-                  color: option.textColor,
-                }}
+                className="flex items-center gap-2 rounded-lg border p-2"
               >
                 <Input
                   value={option.label}
@@ -120,7 +116,11 @@ export const DropdownEditor: React.FC<DropdownEditorProps> = ({
                     handleUpdateOption(index, "label", e.target.value)
                   }
                   className="flex-1"
-                  style={{ color: option.textColor }}
+                  autoFocus={index === 0}
+                  style={{
+                    backgroundColor: option.backgroundColor,
+                    color: option.textColor,
+                  }}
                 />
 
                 <Popover>
@@ -136,7 +136,7 @@ export const DropdownEditor: React.FC<DropdownEditorProps> = ({
                         {colors.map((color) => (
                           <button
                             key={`bg-${color}`}
-                            className="w-6 h-6 rounded border"
+                            className="h-6 w-6 rounded border"
                             style={{ backgroundColor: color }}
                             onClick={() =>
                               handleUpdateOption(
@@ -153,7 +153,7 @@ export const DropdownEditor: React.FC<DropdownEditorProps> = ({
                         {colors.map((color) => (
                           <button
                             key={`text-${color}`}
-                            className="w-6 h-6 rounded border"
+                            className="h-6 w-6 rounded border"
                             style={{ backgroundColor: color }}
                             onClick={() =>
                               handleUpdateOption(index, "textColor", color)
@@ -181,7 +181,7 @@ export const DropdownEditor: React.FC<DropdownEditorProps> = ({
             className="w-full"
             onClick={handleAddOption}
           >
-            <Plus className="h-4 w-4 mr-2" />
+            <Plus className="mr-2 h-4 w-4" />
             Add Option
           </Button>
         </div>
