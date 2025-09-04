@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "ts": "tsc -b --noEmit",
+    "tsgo": "tsgo --noEmit"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.1",
