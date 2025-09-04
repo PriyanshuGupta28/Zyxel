@@ -1,16 +1,18 @@
-// components/Spreadsheet/Spreadsheet.tsx
-import React, { useState, useCallback, useEffect } from "react";
+// components/Spreadsheet/Spreadsheet.tsx (Updated with merge handlers)
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { SpreadsheetToolbar } from "./SpreadsheetToolbar";
 import { SpreadsheetGrid } from "./SpreadsheetGrid";
 import { SheetTabs } from "./SheetTabs";
 import { DropdownEditor } from "./DropdownEditor";
+import { LinkDialog } from "./LinkDialog";
 import { useSpreadsheet } from "@/hooks/useSpreadsheet";
 import { Sheet as SheetComponent } from "@/components/ui/sheet";
 import {
   type SpreadsheetState,
   type Sheet,
   type DropdownOption,
+  type CellLink,
 } from "@/types/spreadsheet.types";
 
 const initialSheet: Sheet = {
@@ -19,6 +21,7 @@ const initialSheet: Sheet = {
   cells: {},
   rowHeights: {},
   columnWidths: {},
+  mergedCells: {},
 };
 
 const initialState: SpreadsheetState = {
@@ -37,11 +40,18 @@ export const Spreadsheet: React.FC = () => {
   const [editingDropdownCell, setEditingDropdownCell] = useState<string | null>(
     null
   );
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+  const [editingLinkCell, setEditingLinkCell] = useState<string | null>(null);
+  const typingTimeoutRef = useRef<NodeJS.Timeout>(null);
+  const [typingBuffer, setTypingBuffer] = useState("");
 
   const {
     handleCellChange,
     handleCellFormatChange,
+    handleCellLinkChange,
     handleCellDropdownChange,
+    handleMergeCells,
+    handleUnmergeCells,
     handleFillCells,
     handleCellSelect,
     handleCellEdit,
@@ -61,6 +71,58 @@ export const Spreadsheet: React.FC = () => {
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
+      // Handle typing when cell is selected but not editing
+      if (
+        state.selectedCells.length === 1 &&
+        !state.editingCell &&
+        !e.ctrlKey &&
+        !e.metaKey &&
+        !e.altKey
+      ) {
+        const key = e.key;
+
+        // Check if it's a printable character
+        if (key.length === 1 || key === "Backspace" || key === "Delete") {
+          e.preventDefault();
+
+          if (key === "Backspace" || key === "Delete") {
+            // Clear selected cells
+            handleDelete();
+            return;
+          }
+
+          // Start typing in the cell
+          const cellId = state.selectedCells[0];
+          handleCellEdit(cellId);
+
+          // Set initial typing buffer
+          if (typingTimeoutRef.current) {
+            clearTimeout(typingTimeoutRef.current);
+          }
+
+          setTypingBuffer(key);
+          typingTimeoutRef.current = setTimeout(() => {
+            if (typingBuffer) {
+              handleCellChange(cellId, typingBuffer, false);
+              setTypingBuffer("");
+            }
+          }, 0);
+
+          return;
+        }
+      }
+
+      // Handle multiple cell selection delete
+      if (
+        (e.key === "Backspace" || e.key === "Delete") &&
+        state.selectedCells.length > 0 &&
+        !state.editingCell
+      ) {
+        e.preventDefault();
+        handleDelete();
+        return;
+      }
+
       if (state.editingCell) return;
 
       const activeSheet = state.sheets.find(
@@ -69,9 +131,7 @@ export const Spreadsheet: React.FC = () => {
       if (!activeSheet) return;
 
       if (state.selectedCells.length === 1) {
-        const [row, col] = state.selectedCells[0]?.split("-").map(Number) ?? [];
-        if (row === undefined || col === undefined) return; // add this line
-
+        const [row, col] = state.selectedCells[0].split("-").map(Number);
         let newRow = row;
         let newCol = col;
 
@@ -98,16 +158,15 @@ export const Spreadsheet: React.FC = () => {
             break;
           case "Enter":
             e.preventDefault();
-            handleCellEdit(state.selectedCells[0] || "");
+            if (!e.shiftKey) {
+              handleCellEdit(state.selectedCells[0]);
+            } else {
+              newRow = Math.max(0, row - 1);
+            }
             return;
           case "F2":
             e.preventDefault();
-            handleCellEdit(state.selectedCells[0] || "");
-            return;
-          case "Delete":
-          case "Backspace":
-            e.preventDefault();
-            handleDelete();
+            handleCellEdit(state.selectedCells[0]);
             return;
         }
 
@@ -164,6 +223,8 @@ export const Spreadsheet: React.FC = () => {
       handleCopy,
       handlePaste,
       handleCellFormatChange,
+      handleCellChange,
+      typingBuffer,
     ]
   );
 
@@ -171,6 +232,13 @@ export const Spreadsheet: React.FC = () => {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleKeyDown]);
+
+  useEffect(() => {
+    if (state.editingCell && typingBuffer) {
+      handleCellChange(state.editingCell, typingBuffer, false);
+      setTypingBuffer("");
+    }
+  }, [state.editingCell, typingBuffer, handleCellChange]);
 
   const activeSheet = state.sheets.find((s) => s.id === state.activeSheetId);
 
@@ -195,8 +263,19 @@ export const Spreadsheet: React.FC = () => {
     [handleCellDropdownChange]
   );
 
+  const handleLinkSave = useCallback(
+    (link: CellLink) => {
+      if (editingLinkCell) {
+        handleCellLinkChange(editingLinkCell, link);
+        setLinkDialogOpen(false);
+        setEditingLinkCell(null);
+      }
+    },
+    [editingLinkCell, handleCellLinkChange]
+  );
+
   return (
-    <div className="bg-background flex h-full flex-col">
+    <div className="flex flex-col h-screen bg-background">
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -209,6 +288,16 @@ export const Spreadsheet: React.FC = () => {
           onFormatChange={(format) => {
             if (state.selectedCells.length > 0) {
               handleCellFormatChange(state.selectedCells, format);
+            }
+          }}
+          onMergeCells={() => {
+            if (state.selectedCells.length > 1) {
+              handleMergeCells(state.selectedCells);
+            }
+          }}
+          onUnmergeCells={() => {
+            if (state.selectedCells.length > 0) {
+              handleUnmergeCells(state.selectedCells);
             }
           }}
         />
@@ -231,6 +320,12 @@ export const Spreadsheet: React.FC = () => {
               setDropdownEditorOpen(true);
             }}
             onDropdownRemove={handleDropdownRemove}
+            onLinkEdit={(cellId) => {
+              setEditingLinkCell(cellId);
+              setLinkDialogOpen(true);
+            }}
+            onMergeCells={handleMergeCells}
+            onUnmergeCells={handleUnmergeCells}
           />
         )}
       </div>
@@ -260,11 +355,11 @@ export const Spreadsheet: React.FC = () => {
       >
         <DropdownEditor
           cellId={editingDropdownCell}
-          // currentDropdown={
-          //   editingDropdownCell
-          //     ? activeSheet?.cells[editingDropdownCell]?.dropdown
-          //     : undefined
-          // }
+          currentDropdown={
+            editingDropdownCell && activeSheet
+              ? activeSheet.cells[editingDropdownCell]?.dropdown
+              : undefined
+          }
           onSave={handleDropdownSave}
           onClose={() => {
             setDropdownEditorOpen(false);
@@ -272,6 +367,17 @@ export const Spreadsheet: React.FC = () => {
           }}
         />
       </SheetComponent>
+
+      <LinkDialog
+        open={linkDialogOpen}
+        onOpenChange={setLinkDialogOpen}
+        currentLink={
+          editingLinkCell && activeSheet
+            ? activeSheet.cells[editingLinkCell]?.link
+            : undefined
+        }
+        onSave={handleLinkSave}
+      />
     </div>
   );
 };
