@@ -155,8 +155,8 @@ export const CellComponent = memo(
             ? "flex-start"
             : cell?.format?.verticalAlign === "bottom"
             ? "flex-end"
-            : "center",
-        whiteSpace: cell?.format?.textWrap === "wrap" ? "pre-wrap" : "nowrap",
+            : "top",
+        whiteSpace: cell?.format?.textWrap === "wrap" ? "break-word" : "nowrap",
         overflow: cell?.format?.textWrap === "clip" ? "hidden" : "visible",
         textOverflow: cell?.format?.textWrap === "clip" ? "ellipsis" : "unset",
         wordBreak: cell?.format?.textWrap === "wrap" ? "break-word" : "normal",
