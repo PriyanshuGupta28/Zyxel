@@ -1,7 +1,7 @@
 // components/Spreadsheet/SpreadsheetGrid.tsx
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import { type Sheet } from "@/types/claude/spreadsheet.types";
+import { type Sheet } from "@/types/spreadsheet.types";
 import { CellComponent } from "./Cell";
 import {
   ContextMenu,
@@ -114,8 +114,23 @@ export const SpreadsheetGrid: React.FC<SpreadsheetGridProps> = ({
 
   const getSelectedRange = useCallback(
     (start: string, end: string): string[] => {
-      const [startRow, startCol] = start.split("-").map(Number);
-      const [endRow, endCol] = end.split("-").map(Number);
+      const [startRowStr = "", startColStr = ""] = start.split("-", 2);
+      const [endRowStr = "", endColStr = ""] = end.split("-", 2);
+
+      const startRow = Number.parseInt(startRowStr, 10);
+      const startCol = Number.parseInt(startColStr, 10);
+      const endRow = Number.parseInt(endRowStr, 10);
+      const endCol = Number.parseInt(endColStr, 10);
+
+      // Bail out if inputs aren't valid numbers
+      if (
+        Number.isNaN(startRow) ||
+        Number.isNaN(startCol) ||
+        Number.isNaN(endRow) ||
+        Number.isNaN(endCol)
+      ) {
+        return [];
+      }
 
       const minRow = Math.min(startRow, endRow);
       const maxRow = Math.max(startRow, endRow);
@@ -175,8 +190,10 @@ export const SpreadsheetGrid: React.FC<SpreadsheetGridProps> = ({
         onCellSelect(range, false);
       } else if (isFillDragging && selectedCells.length > 0) {
         const firstSelected = selectedCells[0];
-        const range = getSelectedRange(firstSelected, cellId);
-        setFillRange(range.filter((id) => !selectedCells.includes(id)));
+        if (firstSelected) {
+          const range = getSelectedRange(firstSelected, cellId);
+          setFillRange(range.filter((id) => !selectedCells.includes(id)));
+        }
       }
     },
     [
@@ -280,7 +297,7 @@ export const SpreadsheetGrid: React.FC<SpreadsheetGridProps> = ({
   const CellRenderer = useCallback(
     ({ columnIndex, rowIndex, style }: any) => {
       if (rowIndex === 0 && columnIndex === 0) {
-        return <div style={style} className="border-r border-b bg-muted/50" />;
+        return <div style={style} className="bg-muted/50 border-r border-b" />;
       }
 
       if (rowIndex === 0) {
@@ -288,13 +305,13 @@ export const SpreadsheetGrid: React.FC<SpreadsheetGridProps> = ({
         return (
           <div
             style={style}
-            className="border-r border-b bg-muted/50 flex items-center justify-center relative group select-none"
+            className="bg-muted/50 group relative flex items-center justify-center border-r border-b select-none"
           >
             <span className="text-sm font-medium">
               {getColumnLabel(colIndex)}
             </span>
             <div
-              className="absolute right-0 top-0 w-1 h-full cursor-col-resize opacity-0 group-hover:opacity-100 hover:bg-primary/20 z-10"
+              className="hover:bg-primary/20 absolute top-0 right-0 z-10 h-full w-1 cursor-col-resize opacity-0 group-hover:opacity-100"
               onMouseDown={(e) => handleColumnResize(e, colIndex)}
             />
           </div>
@@ -306,11 +323,11 @@ export const SpreadsheetGrid: React.FC<SpreadsheetGridProps> = ({
         return (
           <div
             style={style}
-            className="border-r border-b bg-muted/50 flex items-center justify-center relative group select-none"
+            className="bg-muted/50 group relative flex items-center justify-center border-r border-b select-none"
           >
             <span className="text-sm font-medium">{row + 1}</span>
             <div
-              className="absolute bottom-0 left-0 w-full h-1 cursor-row-resize opacity-0 group-hover:opacity-100 hover:bg-primary/20 z-10"
+              className="hover:bg-primary/20 absolute bottom-0 left-0 z-10 h-1 w-full cursor-row-resize opacity-0 group-hover:opacity-100"
               onMouseDown={(e) => handleRowResize(e, row)}
             />
           </div>
@@ -335,8 +352,8 @@ export const SpreadsheetGrid: React.FC<SpreadsheetGridProps> = ({
                 zIndex: isEditing ? 100 : isSelected ? 10 : 1,
               }}
               className={cn(
-                "border-r border-b relative group bg-background",
-                isSelected && !isEditing && "ring-2 ring-primary ring-inset",
+                "group bg-background relative border-r border-b",
+                isSelected && !isEditing && "ring-primary ring-2 ring-inset",
                 isFillHighlighted && "bg-primary/10"
               )}
               onMouseDown={(e) => !isEditing && handleCellMouseDown(e, cellId)}
@@ -354,7 +371,7 @@ export const SpreadsheetGrid: React.FC<SpreadsheetGridProps> = ({
                 !isEditing &&
                 selectedCells[selectedCells.length - 1] === cellId && (
                   <div
-                    className="fill-handle absolute w-2 h-2 bg-primary border border-white cursor-crosshair"
+                    className="fill-handle bg-primary absolute h-2 w-2 cursor-crosshair border border-white"
                     style={{
                       bottom: "-4px",
                       right: "-4px",
@@ -371,11 +388,11 @@ export const SpreadsheetGrid: React.FC<SpreadsheetGridProps> = ({
             {hasDropdown ? (
               <>
                 <ContextMenuItem onClick={() => onDropdownEdit(cellId)}>
-                  <Edit2 className="w-4 h-4 mr-2" />
+                  <Edit2 className="mr-2 h-4 w-4" />
                   Edit Dropdown
                 </ContextMenuItem>
                 <ContextMenuItem onClick={() => onDropdownRemove(cellId)}>
-                  <Trash2 className="w-4 h-4 mr-2" />
+                  <Trash2 className="mr-2 h-4 w-4" />
                   Remove Dropdown
                 </ContextMenuItem>
               </>
@@ -414,7 +431,7 @@ export const SpreadsheetGrid: React.FC<SpreadsheetGridProps> = ({
   return (
     <div
       ref={containerRef}
-      className="relative w-full h-full overflow-hidden bg-background"
+      className="bg-background relative h-full w-full overflow-hidden"
     >
       <Grid
         ref={gridRef}
