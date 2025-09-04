@@ -1,16 +1,23 @@
 // components/Spreadsheet/SpreadsheetGrid.tsx
-import React, { useState, useRef, useCallback, useEffect } from "react";
+import React, {
+  useState,
+  useRef,
+  useCallback,
+  useEffect,
+  useMemo,
+} from "react";
 import { cn } from "@/lib/utils";
-import { type Sheet } from "@/types/spreadsheet.types";
+import { type Sheet, type GridCellData } from "@/types/spreadsheet.types";
 import { CellComponent } from "./Cell";
 import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
+  ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { VariableSizeGrid as Grid } from "react-window";
-import { Edit2, Trash2 } from "lucide-react";
+import { Edit2, Trash2, Link2, Merge, SplitSquareVertical } from "lucide-react";
 
 interface SpreadsheetGridProps {
   sheet: Sheet;
@@ -24,6 +31,9 @@ interface SpreadsheetGridProps {
   onResizeRow: (row: number, height: number) => void;
   onDropdownEdit: (cellId: string) => void;
   onDropdownRemove: (cellId: string) => void;
+  onLinkEdit: (cellId: string) => void;
+  onMergeCells: (cellIds: string[]) => void;
+  onUnmergeCells: (cellIds: string[]) => void;
 }
 
 const HEADER_HEIGHT = 30;
@@ -43,6 +53,9 @@ export const SpreadsheetGrid: React.FC<SpreadsheetGridProps> = ({
   onResizeRow,
   onDropdownEdit,
   onDropdownRemove,
+  onLinkEdit,
+  onMergeCells,
+  onUnmergeCells,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<Grid>(null);
@@ -71,16 +84,21 @@ export const SpreadsheetGrid: React.FC<SpreadsheetGridProps> = ({
   useEffect(() => {
     const updateSize = () => {
       if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
         setContainerSize({
-          width: containerRef.current.clientWidth,
-          height: containerRef.current.clientHeight,
+          width: rect.width,
+          height: rect.height,
         });
       }
     };
 
     updateSize();
-    window.addEventListener("resize", updateSize);
-    return () => window.removeEventListener("resize", updateSize);
+    const resizeObserver = new ResizeObserver(updateSize);
+    if (containerRef.current) {
+      resizeObserver.observe(containerRef.current);
+    }
+
+    return () => resizeObserver.disconnect();
   }, []);
 
   const getColumnLabel = useCallback((index: number) => {
@@ -95,16 +113,67 @@ export const SpreadsheetGrid: React.FC<SpreadsheetGridProps> = ({
 
   const getColumnWidth = useCallback(
     (index: number) => {
-      return sheet.columnWidths[index] || DEFAULT_COLUMN_WIDTH;
+      return (
+        sheet.columnWidths[index] ||
+        sheet.defaultColumnWidth ||
+        DEFAULT_COLUMN_WIDTH
+      );
     },
-    [sheet.columnWidths]
+    [sheet.columnWidths, sheet.defaultColumnWidth]
+  );
+
+  // Calculate row height considering text wrap
+  const calculateRowHeightForWrappedText = useCallback(
+    (row: number): number => {
+      let maxHeight = sheet.rowHeights[row] || DEFAULT_ROW_HEIGHT;
+
+      // Check all cells in this row for wrapped text
+      for (let col = 0; col < totalCols; col++) {
+        const cellId = `${row}-${col}`;
+        const cell = sheet.cells[cellId];
+
+        if (cell?.format?.textWrap === "wrap" && cell.value) {
+          const columnWidth = getColumnWidth(col);
+          const fontSize = cell.format.fontSize || 14;
+          const padding = 16; // Account for cell padding
+
+          // Create a temporary element to measure text
+          const measureDiv = document.createElement("div");
+          measureDiv.style.cssText = `
+          position: absolute;
+          visibility: hidden;
+          width: ${columnWidth - padding}px;
+          font-size: ${fontSize}px;
+          font-family: ${cell.format.fontFamily || "inherit"};
+          white-space: pre-wrap;
+          word-break: break-word;
+        `;
+          measureDiv.textContent = cell.value;
+          document.body.appendChild(measureDiv);
+
+          const textHeight = measureDiv.offsetHeight;
+          document.body.removeChild(measureDiv);
+
+          const requiredHeight = Math.max(
+            DEFAULT_ROW_HEIGHT,
+            textHeight + padding
+          );
+          maxHeight = Math.max(maxHeight, requiredHeight);
+        }
+      }
+
+      return maxHeight;
+    },
+    [sheet.cells, sheet.rowHeights, getColumnWidth, totalCols]
   );
 
   const getRowHeight = useCallback(
     (index: number) => {
-      return sheet.rowHeights[index] || DEFAULT_ROW_HEIGHT;
+      // Always calculate height for rows with wrapped text
+      const calculatedHeight = calculateRowHeightForWrappedText(index);
+      return calculatedHeight;
     },
-    [sheet.rowHeights]
+    [calculateRowHeightForWrappedText]
   );
 
   const getCellId = useCallback(
@@ -114,23 +183,8 @@ export const SpreadsheetGrid: React.FC<SpreadsheetGridProps> = ({
 
   const getSelectedRange = useCallback(
     (start: string, end: string): string[] => {
-      const [startRowStr = "", startColStr = ""] = start.split("-", 2);
-      const [endRowStr = "", endColStr = ""] = end.split("-", 2);
-
-      const startRow = Number.parseInt(startRowStr, 10);
-      const startCol = Number.parseInt(startColStr, 10);
-      const endRow = Number.parseInt(endRowStr, 10);
-      const endCol = Number.parseInt(endColStr, 10);
-
-      // Bail out if inputs aren't valid numbers
-      if (
-        Number.isNaN(startRow) ||
-        Number.isNaN(startCol) ||
-        Number.isNaN(endRow) ||
-        Number.isNaN(endCol)
-      ) {
-        return [];
-      }
+      const [startRow, startCol] = start.split("-").map(Number);
+      const [endRow, endCol] = end.split("-").map(Number);
 
       const minRow = Math.min(startRow, endRow);
       const maxRow = Math.max(startRow, endRow);
@@ -147,6 +201,31 @@ export const SpreadsheetGrid: React.FC<SpreadsheetGridProps> = ({
     },
     []
   );
+
+  const canMergeCells = useCallback((): boolean => {
+    if (selectedCells.length < 2) return false;
+
+    // Check if any selected cell is already part of a merge
+    for (const cellId of selectedCells) {
+      const mergedInfo = sheet.mergedCells[cellId];
+      if (mergedInfo) return false;
+    }
+
+    // Check if selection forms a rectangle
+    const rows = selectedCells.map((id) => parseInt(id.split("-")[0]));
+    const cols = selectedCells.map((id) => parseInt(id.split("-")[1]));
+    const minRow = Math.min(...rows);
+    const maxRow = Math.max(...rows);
+    const minCol = Math.min(...cols);
+    const maxCol = Math.max(...cols);
+
+    const expectedCount = (maxRow - minRow + 1) * (maxCol - minCol + 1);
+    return selectedCells.length === expectedCount;
+  }, [selectedCells, sheet.mergedCells]);
+
+  const canUnmergeCells = useCallback((): boolean => {
+    return selectedCells.some((cellId) => sheet.mergedCells[cellId]?.isOrigin);
+  }, [selectedCells, sheet.mergedCells]);
 
   const handleCellMouseDown = useCallback(
     (e: React.MouseEvent, cellId: string) => {
@@ -190,10 +269,8 @@ export const SpreadsheetGrid: React.FC<SpreadsheetGridProps> = ({
         onCellSelect(range, false);
       } else if (isFillDragging && selectedCells.length > 0) {
         const firstSelected = selectedCells[0];
-        if (firstSelected) {
-          const range = getSelectedRange(firstSelected, cellId);
-          setFillRange(range.filter((id) => !selectedCells.includes(id)));
-        }
+        const range = getSelectedRange(firstSelected, cellId);
+        setFillRange(range.filter((id) => !selectedCells.includes(id)));
       }
     },
     [
@@ -294,10 +371,11 @@ export const SpreadsheetGrid: React.FC<SpreadsheetGridProps> = ({
     handleResizeMouseUp,
   ]);
 
-  const CellRenderer = useCallback(
-    ({ columnIndex, rowIndex, style }: any) => {
+  // Memoize cell renderer to prevent unnecessary re-renders
+  const CellRenderer = useMemo(() => {
+    return ({ columnIndex, rowIndex, style }: GridCellData) => {
       if (rowIndex === 0 && columnIndex === 0) {
-        return <div style={style} className="bg-muted/50 border-r border-b" />;
+        return <div style={style} className="border-r border-b bg-muted/50" />;
       }
 
       if (rowIndex === 0) {
@@ -305,13 +383,13 @@ export const SpreadsheetGrid: React.FC<SpreadsheetGridProps> = ({
         return (
           <div
             style={style}
-            className="bg-muted/50 group relative flex items-center justify-center border-r border-b select-none"
+            className="border-r border-b bg-muted/50 flex items-center justify-center relative group select-none"
           >
             <span className="text-sm font-medium">
               {getColumnLabel(colIndex)}
             </span>
             <div
-              className="hover:bg-primary/20 absolute top-0 right-0 z-10 h-full w-1 cursor-col-resize opacity-0 group-hover:opacity-100"
+              className="absolute right-0 top-0 w-1 h-full cursor-col-resize opacity-0 group-hover:opacity-100 hover:bg-primary/20 z-10"
               onMouseDown={(e) => handleColumnResize(e, colIndex)}
             />
           </div>
@@ -323,11 +401,11 @@ export const SpreadsheetGrid: React.FC<SpreadsheetGridProps> = ({
         return (
           <div
             style={style}
-            className="bg-muted/50 group relative flex items-center justify-center border-r border-b select-none"
+            className="border-r border-b bg-muted/50 flex items-center justify-center relative group select-none"
           >
             <span className="text-sm font-medium">{row + 1}</span>
             <div
-              className="hover:bg-primary/20 absolute bottom-0 left-0 z-10 h-1 w-full cursor-row-resize opacity-0 group-hover:opacity-100"
+              className="absolute bottom-0 left-0 w-full h-1 cursor-row-resize opacity-0 group-hover:opacity-100 hover:bg-primary/20 z-10"
               onMouseDown={(e) => handleRowResize(e, row)}
             />
           </div>
@@ -342,18 +420,40 @@ export const SpreadsheetGrid: React.FC<SpreadsheetGridProps> = ({
       const isEditing = editingCell === cellId;
       const isFillHighlighted = fillRange.includes(cellId);
       const hasDropdown = cell?.dropdown !== undefined;
+      const hasLink = cell?.link !== undefined;
+      const mergedInfo = sheet.mergedCells[cellId];
+
+      // Skip rendering non-origin merged cells
+      if (mergedInfo && !mergedInfo.isOrigin) {
+        return null;
+      }
+
+      // Adjust style for merged cells
+      let cellStyle = { ...style };
+      if (mergedInfo?.isOrigin) {
+        cellStyle = {
+          ...cellStyle,
+          width: (style.width as number) * mergedInfo.colSpan,
+          height: (style.height as number) * mergedInfo.rowSpan,
+          zIndex: 2,
+        };
+      }
 
       return (
         <ContextMenu key={`context-${cellId}`}>
           <ContextMenuTrigger asChild>
             <div
               style={{
-                ...style,
-                zIndex: isEditing ? 100 : isSelected ? 10 : 1,
+                ...cellStyle,
+                zIndex: isEditing
+                  ? 100
+                  : isSelected
+                  ? 10
+                  : cellStyle.zIndex || 1,
               }}
               className={cn(
-                "group bg-background relative border-r border-b",
-                isSelected && !isEditing && "ring-primary ring-2 ring-inset",
+                "border-r border-b relative group bg-background",
+                isSelected && !isEditing && "ring-2 ring-primary ring-inset",
                 isFillHighlighted && "bg-primary/10"
               )}
               onMouseDown={(e) => !isEditing && handleCellMouseDown(e, cellId)}
@@ -366,12 +466,17 @@ export const SpreadsheetGrid: React.FC<SpreadsheetGridProps> = ({
                 isEditing={isEditing}
                 onChange={(value) => onCellChange(cellId, value)}
                 onStopEdit={() => onCellEdit(null)}
+                onStartEdit={() => onCellEdit(cellId)}
+                columnWidth={
+                  getColumnWidth(actualCol) * (mergedInfo?.colSpan || 1)
+                }
+                rowHeight={getRowHeight(actualRow) * (mergedInfo?.rowSpan || 1)}
               />
               {isSelected &&
                 !isEditing &&
                 selectedCells[selectedCells.length - 1] === cellId && (
                   <div
-                    className="fill-handle bg-primary absolute h-2 w-2 cursor-crosshair border border-white"
+                    className="fill-handle absolute w-2 h-2 bg-primary border border-white cursor-crosshair"
                     style={{
                       bottom: "-4px",
                       right: "-4px",
@@ -385,14 +490,38 @@ export const SpreadsheetGrid: React.FC<SpreadsheetGridProps> = ({
             <ContextMenuItem onClick={() => onCellEdit(cellId)}>
               Edit Cell
             </ContextMenuItem>
+            {canMergeCells() && (
+              <ContextMenuItem onClick={() => onMergeCells(selectedCells)}>
+                <Merge className="w-4 h-4 mr-2" />
+                Merge Cells
+              </ContextMenuItem>
+            )}
+            {canUnmergeCells() && (
+              <ContextMenuItem onClick={() => onUnmergeCells(selectedCells)}>
+                <SplitSquareVertical className="w-4 h-4 mr-2" />
+                Unmerge Cells
+              </ContextMenuItem>
+            )}
+            <ContextMenuSeparator />
+            {hasLink ? (
+              <ContextMenuItem onClick={() => onLinkEdit(cellId)}>
+                <Edit2 className="w-4 h-4 mr-2" />
+                Edit Link
+              </ContextMenuItem>
+            ) : (
+              <ContextMenuItem onClick={() => onLinkEdit(cellId)}>
+                <Link2 className="w-4 h-4 mr-2" />
+                Insert Link
+              </ContextMenuItem>
+            )}
             {hasDropdown ? (
               <>
                 <ContextMenuItem onClick={() => onDropdownEdit(cellId)}>
-                  <Edit2 className="mr-2 h-4 w-4" />
+                  <Edit2 className="w-4 h-4 mr-2" />
                   Edit Dropdown
                 </ContextMenuItem>
                 <ContextMenuItem onClick={() => onDropdownRemove(cellId)}>
-                  <Trash2 className="mr-2 h-4 w-4" />
+                  <Trash2 className="w-4 h-4 mr-2" />
                   Remove Dropdown
                 </ContextMenuItem>
               </>
@@ -401,6 +530,7 @@ export const SpreadsheetGrid: React.FC<SpreadsheetGridProps> = ({
                 Add Dropdown
               </ContextMenuItem>
             )}
+            <ContextMenuSeparator />
             <ContextMenuItem>Copy</ContextMenuItem>
             <ContextMenuItem>Paste</ContextMenuItem>
             <ContextMenuItem onClick={() => onCellChange(cellId, "")}>
@@ -409,29 +539,36 @@ export const SpreadsheetGrid: React.FC<SpreadsheetGridProps> = ({
           </ContextMenuContent>
         </ContextMenu>
       );
-    },
-    [
-      sheet.cells,
-      selectedCells,
-      editingCell,
-      fillRange,
-      getColumnLabel,
-      getCellId,
-      handleCellMouseDown,
-      handleCellMouseEnter,
-      handleColumnResize,
-      handleRowResize,
-      onCellChange,
-      onCellEdit,
-      onDropdownEdit,
-      onDropdownRemove,
-    ]
-  );
+    };
+  }, [
+    sheet.cells,
+    sheet.mergedCells,
+    selectedCells,
+    editingCell,
+    fillRange,
+    getColumnLabel,
+    getCellId,
+    getColumnWidth,
+    getRowHeight,
+    handleCellMouseDown,
+    handleCellMouseEnter,
+    handleColumnResize,
+    handleRowResize,
+    onCellChange,
+    onCellEdit,
+    onDropdownEdit,
+    onDropdownRemove,
+    onLinkEdit,
+    onMergeCells,
+    onUnmergeCells,
+    canMergeCells,
+    canUnmergeCells,
+  ]);
 
   return (
     <div
       ref={containerRef}
-      className="bg-background relative h-full w-full overflow-hidden"
+      className="relative w-full h-full overflow-hidden bg-background"
     >
       <Grid
         ref={gridRef}
@@ -446,8 +583,9 @@ export const SpreadsheetGrid: React.FC<SpreadsheetGridProps> = ({
           index === 0 ? HEADER_HEIGHT : getRowHeight(index - 1)
         }
         width={containerSize.width}
-        overscanRowCount={5}
-        overscanColumnCount={3}
+        overscanRowCount={3}
+        overscanColumnCount={2}
+        itemData={{ sheet, selectedCells, editingCell }}
       >
         {CellRenderer}
       </Grid>
