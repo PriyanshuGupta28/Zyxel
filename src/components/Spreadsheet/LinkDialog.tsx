@@ -1,4 +1,3 @@
-// components/Spreadsheet/LinkDialog.tsx
 import React, { useState } from "react";
 import {
   Dialog,
