@@ -1,4 +1,3 @@
-// components/Spreadsheet/SpreadsheetGrid.tsx
 import React, {
   useState,
   useRef,
@@ -23,6 +22,7 @@ interface SpreadsheetGridProps {
   sheet: Sheet;
   selectedCells: string[];
   editingCell: string | null;
+  typingBuffer?: string;
   onCellChange: (cellId: string, value: string) => void;
   onCellSelect: (cellIds: string[], multi?: boolean) => void;
   onCellEdit: (cellId: string | null) => void;
@@ -45,6 +45,7 @@ export const SpreadsheetGrid: React.FC<SpreadsheetGridProps> = ({
   sheet,
   selectedCells,
   editingCell,
+  typingBuffer = "",
   onCellChange,
   onCellSelect,
   onCellEdit,
@@ -462,6 +463,7 @@ export const SpreadsheetGrid: React.FC<SpreadsheetGridProps> = ({
               <CellComponent
                 key={`cell-${cellId}-${isEditing}`}
                 cell={cell}
+                initialValue={isEditing && typingBuffer ? typingBuffer : ""}
                 isSelected={isSelected}
                 isEditing={isEditing}
                 onChange={(value) => onCellChange(cellId, value)}
@@ -544,6 +546,7 @@ export const SpreadsheetGrid: React.FC<SpreadsheetGridProps> = ({
     sheet.cells,
     sheet.mergedCells,
     selectedCells,
+    typingBuffer,
     editingCell,
     fillRange,
     getColumnLabel,
