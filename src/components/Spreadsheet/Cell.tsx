@@ -1,7 +1,7 @@
 // components/Spreadsheet/Cell.tsx
 import React, { useState, useRef, useEffect, memo } from "react";
 import { cn } from "@/lib/utils";
-import { type Cell } from "@/types/claude/spreadsheet.types";
+import { type Cell } from "@/types/spreadsheet.types";
 import {
   Select,
   SelectContent,
@@ -21,7 +21,7 @@ interface CellComponentProps {
 export const CellComponent = memo(
   ({
     cell,
-    isSelected,
+    // isSelected,
     isEditing,
     onChange,
     onStopEdit,
@@ -146,18 +146,24 @@ export const CellComponent = memo(
 
     if (cell?.dropdown && !isEditing) {
       return (
-        <div className="w-full h-full flex" style={getCellStyle()}>
+        <div className="flex h-full w-full" style={getCellStyle()}>
           <Select value={cell.value || ""} onValueChange={onChange}>
             <SelectTrigger
-              className="w-full h-full border-0 rounded-none focus:ring-0 focus:ring-offset-0"
+              className="h-full w-full rounded-none border-0 focus:ring-0 focus:ring-offset-0"
               style={{
                 backgroundColor: cell.format?.backgroundColor || "transparent",
                 color: cell.format?.textColor || "inherit",
               }}
             >
-              <SelectValue />
+              <SelectValue
+                style={{
+                  backgroundColor:
+                    cell.format?.backgroundColor || "transparent",
+                  color: cell.format?.textColor || "inherit",
+                }}
+              />
             </SelectTrigger>
-            <SelectContent className="z-[10000]">
+            <SelectContent className="z-[1000]">
               {cell.dropdown.options.map((option) => (
                 <SelectItem
                   key={option.value}
@@ -182,7 +188,7 @@ export const CellComponent = memo(
         <input
           ref={inputRef}
           type="text"
-          className="absolute inset-0 w-full h-full px-2 py-1 outline-none bg-background border-2 border-primary"
+          className="bg-background border-primary absolute inset-0 h-full w-full border-2 px-2 py-1 outline-none"
           value={localValue}
           onChange={handleInputChange}
           onKeyDown={handleInputKeyDown}
@@ -199,7 +205,7 @@ export const CellComponent = memo(
 
     return (
       <div
-        className="w-full h-full px-2 py-1 flex overflow-hidden"
+        className="flex h-full w-full overflow-hidden px-2 py-1"
         style={getCellStyle()}
       >
         <span className={cn(cell?.format?.textWrap === "clip" && "truncate")}>
