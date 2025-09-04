@@ -6,6 +6,14 @@ export interface Cell {
   format?: CellFormat;
   dropdown?: DropdownOptions;
   link?: CellLink;
+  merged?: MergedCell;
+}
+
+export interface MergedCell {
+  rowSpan: number;
+  colSpan: number;
+  isOrigin: boolean;
+  originCell?: string;
 }
 
 export interface CellLink {
@@ -57,6 +65,7 @@ export interface Sheet {
   cells: Record<string, Cell>;
   rowHeights: Record<number, number>;
   columnWidths: Record<number, number>;
+  mergedCells: Record<string, MergedCell>;
   defaultRowHeight?: number;
   defaultColumnWidth?: number;
   hidden?: boolean;
@@ -76,4 +85,10 @@ export interface SpreadsheetState {
 export interface HistoryEntry {
   sheets: Sheet[];
   selectedCells: string[];
+}
+
+export interface GridCellData {
+  columnIndex: number;
+  rowIndex: number;
+  style: React.CSSProperties;
 }
