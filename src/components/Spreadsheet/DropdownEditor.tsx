@@ -2,7 +2,11 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, X, Palette } from "lucide-react";
-import { type Sheet, type DropdownOption } from "@/types/spreadsheet.types";
+import {
+  type Sheet,
+  type DropdownOption,
+  type DropdownOptions,
+} from "@/types/spreadsheet.types";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -21,6 +25,7 @@ import { Input } from "@/components/ui/input";
 interface DropdownEditorProps {
   cellId: string | null;
   sheet?: Sheet;
+  currentDropdown: DropdownOptions | undefined;
   onSave: (options: DropdownOption[]) => void;
   onClose: () => void;
 }
