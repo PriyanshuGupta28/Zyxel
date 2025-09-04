@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import { motion, Reorder } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Plus, MoreVertical, X } from "lucide-react";
-import { type Sheet } from "@/types/claude/spreadsheet.types";
+import { type Sheet } from "@/types/spreadsheet.types";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ScrollArea, ScrollBar } from "../ui/scroll-area";
 
 interface SheetTabsProps {
   sheets: Sheet[];
@@ -88,156 +89,164 @@ export const SheetTabs: React.FC<SheetTabsProps> = ({
   ];
 
   return (
-    <div className="flex items-center gap-2 p-2 bg-muted/50">
-      <Reorder.Group
-        axis="x"
-        values={reorderSheets}
-        onReorder={setReorderSheets}
-        className="flex items-center gap-1"
-      >
-        {sheets.map((sheet) => (
-          <Reorder.Item key={sheet.id} value={sheet}>
-            <motion.div
-              className={cn(
-                "relative flex items-center gap-2 px-3 py-1 rounded-t cursor-pointer",
-                "hover:bg-background transition-colors group",
-                activeSheetId === sheet.id && "bg-background"
-              )}
-              style={{
-                borderBottom: sheet.color
-                  ? `2px solid ${sheet.color}`
-                  : undefined,
-              }}
-              onClick={() => onSheetSelect(sheet.id)}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              <span className="text-sm select-none">{sheet.name}</span>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
+    <ScrollArea>
+      <div className="bg-muted/50 flex w-full items-center gap-2 p-2">
+        <Reorder.Group
+          axis="x"
+          values={reorderSheets}
+          onReorder={setReorderSheets}
+          className="flex items-center gap-1"
+        >
+          {sheets.map((sheet) => (
+            <Reorder.Item key={sheet.id} value={sheet}>
+              <motion.div
+                className={cn(
+                  "relative flex cursor-pointer items-center gap-2 rounded-t px-3 py-1",
+                  "hover:bg-background group transition-colors",
+                  activeSheetId === sheet.id && "bg-background"
+                )}
+                style={{
+                  borderBottom: sheet.color
+                    ? `2px solid ${sheet.color}`
+                    : undefined,
+                }}
+                onClick={() => onSheetSelect(sheet.id)}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                <span className="text-sm select-none">{sheet.name}</span>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-4 w-4 opacity-0 group-hover:opacity-100"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <MoreVertical className="h-3 w-3" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        setEditingSheet(sheet.id);
+                        setTempName(sheet.name);
+                        setRenameDialogOpen(true);
+                      }}
+                    >
+                      Rename
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => onDuplicateSheet(sheet.id)}
+                    >
+                      Duplicate
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        setEditingSheet(sheet.id);
+                        setTempColor(sheet.color || "");
+                        setColorDialogOpen(true);
+                      }}
+                    >
+                      Change Color
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => onDeleteSheet(sheet.id)}
+                      disabled={sheets.length === 1}
+                      className="text-destructive"
+                    >
+                      Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                {sheets.length > 1 && (
                   <Button
                     variant="ghost"
                     size="icon"
                     className="h-4 w-4 opacity-0 group-hover:opacity-100"
-                    onClick={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDeleteSheet(sheet.id);
+                    }}
                   >
-                    <MoreVertical className="h-3 w-3" />
+                    <X className="h-3 w-3" />
                   </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  <DropdownMenuItem
-                    onClick={() => {
-                      setEditingSheet(sheet.id);
-                      setTempName(sheet.name);
-                      setRenameDialogOpen(true);
-                    }}
-                  >
-                    Rename
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => onDuplicateSheet(sheet.id)}>
-                    Duplicate
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => {
-                      setEditingSheet(sheet.id);
-                      setTempColor(sheet.color || "");
-                      setColorDialogOpen(true);
-                    }}
-                  >
-                    Change Color
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => onDeleteSheet(sheet.id)}
-                    disabled={sheets.length === 1}
-                    className="text-destructive"
-                  >
-                    Delete
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-              {sheets.length > 1 && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-4 w-4 opacity-0 group-hover:opacity-100"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDeleteSheet(sheet.id);
-                  }}
-                >
-                  <X className="h-3 w-3" />
-                </Button>
-              )}
-            </motion.div>
-          </Reorder.Item>
-        ))}
-      </Reorder.Group>
-
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={onAddSheet}
-        className="h-6 w-6"
-      >
-        <Plus className="h-4 w-4" />
-      </Button>
-
-      {/* Rename Dialog */}
-      <Dialog open={renameDialogOpen} onOpenChange={setRenameDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Rename Sheet</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Sheet Name</Label>
-              <Input
-                id="name"
-                value={tempName}
-                onChange={(e) => setTempName(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleRename()}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setRenameDialogOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button onClick={handleRename}>Save</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Color Dialog */}
-      <Dialog open={colorDialogOpen} onOpenChange={setColorDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Change Sheet Color</DialogTitle>
-          </DialogHeader>
-          <div className="grid grid-cols-6 gap-2 py-4">
-            {colors.map((color) => (
-              <button
-                key={color}
-                className={cn(
-                  "w-10 h-10 rounded-md transition-transform hover:scale-110",
-                  tempColor === color && "ring-2 ring-offset-2 ring-primary"
                 )}
-                style={{ backgroundColor: color }}
-                onClick={() => setTempColor(color)}
-              />
-            ))}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setColorDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleColorChange}>Apply</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+              </motion.div>
+            </Reorder.Item>
+          ))}
+        </Reorder.Group>
+
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onAddSheet}
+          className="h-6 w-6"
+        >
+          <Plus className="h-4 w-4" />
+        </Button>
+
+        {/* Rename Dialog */}
+        <Dialog open={renameDialogOpen} onOpenChange={setRenameDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Rename Sheet</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">Sheet Name</Label>
+                <Input
+                  id="name"
+                  value={tempName}
+                  onChange={(e) => setTempName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleRename()}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setRenameDialogOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleRename}>Save</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Color Dialog */}
+        <Dialog open={colorDialogOpen} onOpenChange={setColorDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Change Sheet Color</DialogTitle>
+            </DialogHeader>
+            <div className="grid grid-cols-6 gap-2 py-4">
+              {colors.map((color) => (
+                <button
+                  key={color}
+                  className={cn(
+                    "h-10 w-10 rounded-md transition-transform hover:scale-110",
+                    tempColor === color && "ring-primary ring-2 ring-offset-2"
+                  )}
+                  style={{ backgroundColor: color }}
+                  onClick={() => setTempColor(color)}
+                />
+              ))}
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setColorDialogOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleColorChange}>Apply</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+      <ScrollBar orientation="horizontal" />
+    </ScrollArea>
   );
 };
