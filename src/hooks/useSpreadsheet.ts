@@ -7,7 +7,7 @@ import {
   type CellFormat,
   type DropdownOptions,
   type HistoryEntry,
-} from "@/types/claude/spreadsheet.types";
+} from "@/types/spreadsheet.types";
 
 export const useSpreadsheet = (
   state: SpreadsheetState,
@@ -138,19 +138,20 @@ export const useSpreadsheet = (
         );
         if (!activeSheet) return prev;
 
-        const existingCell = activeSheet.cells[cellId] || {
+        const existingCell: Cell = activeSheet.cells[cellId] || {
           id: cellId,
           value: "",
         };
 
+        const firstOptionValue = dropdown?.options?.[0]?.value;
+
         const updatedCell: Cell = {
           ...existingCell,
-          dropdown: dropdown || undefined,
+          dropdown: dropdown ?? undefined,
+          ...(firstOptionValue !== undefined
+            ? { value: firstOptionValue }
+            : {}),
         };
-
-        if (dropdown && dropdown.options.length > 0 && !existingCell.value) {
-          updatedCell.value = dropdown.options[0].value;
-        }
 
         const updatedSheet: Sheet = {
           ...activeSheet,
@@ -181,7 +182,7 @@ export const useSpreadsheet = (
         if (!activeSheet) return prev;
 
         const updatedCells = { ...activeSheet.cells };
-        const sourceCell = activeSheet.cells[sourceCellIds[0]];
+        const sourceCell = activeSheet.cells[sourceCellIds[0] || ""];
 
         if (sourceCell) {
           targetCellIds.forEach((cellId) => {
@@ -243,13 +244,16 @@ export const useSpreadsheet = (
       if (prev.historyIndex > 0) {
         const newIndex = prev.historyIndex - 1;
         const historyState = prev.history[newIndex];
-        return {
-          ...prev,
-          sheets: JSON.parse(JSON.stringify(historyState.sheets)),
-          selectedCells: [...historyState.selectedCells],
-          historyIndex: newIndex,
-          editingCell: null,
-        };
+        if (historyState) {
+          // Add a null check here
+          return {
+            ...prev,
+            sheets: JSON.parse(JSON.stringify(historyState.sheets)),
+            selectedCells: [...historyState.selectedCells],
+            historyIndex: newIndex,
+            editingCell: null,
+          };
+        }
       }
       return prev;
     });
@@ -260,13 +264,15 @@ export const useSpreadsheet = (
       if (prev.historyIndex < prev.history.length - 1) {
         const newIndex = prev.historyIndex + 1;
         const historyState = prev.history[newIndex];
-        return {
-          ...prev,
-          sheets: JSON.parse(JSON.stringify(historyState.sheets)),
-          selectedCells: [...historyState.selectedCells],
-          historyIndex: newIndex,
-          editingCell: null,
-        };
+        if (historyState) {
+          return {
+            ...prev,
+            sheets: JSON.parse(JSON.stringify(historyState.sheets)),
+            selectedCells: [...historyState.selectedCells],
+            historyIndex: newIndex,
+            editingCell: null,
+          };
+        }
       }
       return prev;
     });
@@ -302,6 +308,7 @@ export const useSpreadsheet = (
         updatedCells[cellId] = {
           ...sourceCell,
           id: cellId,
+          value: sourceCell?.value ?? "",
         };
       });
 
@@ -371,18 +378,22 @@ export const useSpreadsheet = (
   const deleteSheet = useCallback(
     (sheetId: string) => {
       setState((prev) => {
-        if (prev.sheets.length === 1) return prev;
+        if (prev.sheets.length <= 1) return prev;
 
         const filteredSheets = prev.sheets.filter((s) => s.id !== sheetId);
-        const newActiveSheet =
+
+        // If nothing was removed (sheetId not found), keep state as is
+        if (filteredSheets.length === prev.sheets.length) return prev;
+
+        const newActiveSheetId =
           prev.activeSheetId === sheetId
-            ? filteredSheets[0].id
+            ? filteredSheets[0]?.id ?? prev.activeSheetId // <-- avoid possibly undefined
             : prev.activeSheetId;
 
         return {
           ...prev,
           sheets: filteredSheets,
-          activeSheetId: newActiveSheet,
+          activeSheetId: newActiveSheetId,
         };
       });
     },
